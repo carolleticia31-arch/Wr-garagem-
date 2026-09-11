@@ -1,0 +1,50 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>WR Garagem — Acompanhamento</title><style>
+:root{--bg:#0d0f10;--panel:#151819;--line:#2b3032;--text:#f2f3f3;--muted:#9ba2a5;--accent:#d7a84b;--danger:#d85d5d}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+main{max-width:900px;margin:0 auto;padding:18px}.publicBrand{text-align:center;padding:18px 0}.publicBrand img{width:190px;max-width:70%;height:92px;object-fit:contain}.publicStatus{font-size:16px;padding:8px 12px;border-radius:999px;display:inline-block;background:#272b2c;margin:6px 0 14px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px}.muted{color:var(--muted);font-size:13px}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}th{color:#bfc4c6;background:#191c1d}td{color:#e8e9e9}.total{text-align:right;font-size:21px;font-weight:800;padding-top:14px}.publicPhotoGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}.publicPhoto{background:#151819;border:1px solid var(--line);border-radius:10px;overflow:hidden}.publicPhoto img{width:100%;height:180px;object-fit:cover;display:block}.publicPhoto div{padding:8px;font-size:12px;color:#ddd}.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:180px}button{cursor:pointer;border:0;border-radius:7px;padding:12px 14px;font-weight:700}.primary{background:var(--accent);color:#111}.danger{background:#5b2424;color:#fff;border:1px solid #8d3a3a!important}textarea{width:100%;padding:11px;border:1px solid #3a4042;border-radius:7px;background:#0f1112;color:#f1f2f2}.publicApproval{border-color:var(--accent)}
+</style></head><body><main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://tywamxvzbwaogepldnuc.supabase.co';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const osLabel=n=>'OS-'+String(Number(n)||0).padStart(5,'0');
+let sb=null, publicToken=null;
+function getPublicParams(){
+  let p=new URLSearchParams(location.search);
+  if(!p.get('cliente') && location.hash){p=new URLSearchParams(location.hash.replace(/^#/,'').replace(/^\?/,'') )}
+  return {token:p.get('cliente'),key:p.get('k')};
+}
+async function initPublic(){
+  const {token,key}=getPublicParams(); publicToken=token;
+  if(!token||!key)return renderError('Link inválido ou incompleto.');
+  if(!window.supabase?.createClient)return renderError('Não foi possível carregar o portal. Recarregue a página.');
+  sb=window.supabase.createClient(SUPABASE_URL,key);
+  $('app').innerHTML='<div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>Acompanhamento da Ordem de Serviço</h2><div class="muted">Carregando informações...</div></div>';
+  try{let r=await sb.rpc('get_public_os',{p_token:token});if(r.error)throw r.error;let o=r.data;if(!o)return renderError('Link inválido ou expirado.');o._token=token;renderOS(o)}catch(e){console.error(e);renderError('Não foi possível carregar esta OS: '+(e.message||'erro desconhecido'));}
+}
+function renderError(msg){$('app').innerHTML='<div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>WR Garagem</h2></div><div class="panel"><h3>Não foi possível abrir a OS</h3><p>'+esc(msg)+'</p><p class="muted">Peça à oficina um novo link de acompanhamento.</p></div>'}
+function renderOS(o){
+  publicToken=o._token||publicToken;
+  let pecas=o.pecas||[],servicos=o.servicos||[],fotos=(o.fotos||[]).filter(x=>x&&x.arquivo_url);
+  let itens=[...pecas.map(x=>({tipo:'Peça',nome:x.nome,qtd:x.quantidade,valor:x.preco_unitario})),...servicos.map(x=>({tipo:'Serviço',nome:x.nome,qtd:x.quantidade,valor:x.preco_unitario}))];
+  let decision=o.aprovacao_status||'Pendente';
+  let canDecide=['Aguardando aprovação','Orçamento'].includes(o.status||'');
+  let approval=canDecide
+    ? '<div class="panel publicApproval"><h3>📋 Aprovação do orçamento</h3><p>Confira os serviços e valores acima. Você pode aprovar ou recusar este orçamento.</p><div class="row"><button class="primary" onclick="publicApprove()">✅ APROVAR ORÇAMENTO</button><button class="danger" onclick="publicReject()">❌ RECUSAR ORÇAMENTO</button></div><div id="rejectBox" style="display:none;margin-top:12px"><label>Motivo da recusa (opcional)</label><textarea id="rejectReason" rows="3" placeholder="Digite o motivo..."></textarea><button class="danger" style="margin-top:8px" onclick="confirmPublicReject()">Confirmar recusa</button></div></div>'
+    : '<div class="panel publicApproval"><h3>📋 Decisão do orçamento</h3><p><b>Status:</b> '+esc(decision)+'</p>'+(o.cliente_decisao_em?'<p class="muted">Registrado em: '+esc(new Date(o.cliente_decisao_em).toLocaleString('pt-BR'))+'</p>':'')+(o.cliente_recusa_motivo?'<p><b>Motivo:</b> '+esc(o.cliente_recusa_motivo)+'</p>':'')+'</div>';
+  $('app').innerHTML='<div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>'+esc(o.oficina_nome||'WR Garagem')+'</h2><div class="muted">Acompanhamento da Ordem de Serviço '+esc(osLabel(o.numero))+'</div><div class="publicStatus">'+esc(o.status||'Orçamento')+'</div></div>'+
+  '<div class="panel"><h3>🚗 Seu veículo</h3><p><b>'+esc([o.veiculo?.marca,o.veiculo?.modelo,o.veiculo?.ano].filter(Boolean).join(' '))+'</b></p><p>Placa: <b>'+esc(o.veiculo?.placa||'')+'</b> &nbsp; • &nbsp; KM: <b>'+esc(o.km_entrada||o.veiculo?.km||'')+'</b></p><p>Previsão de entrega: <b>'+esc(o.previsao_entrega||'A definir')+'</b></p></div>'+
+  '<div class="panel"><h3>👤 Cliente</h3><p>'+esc(o.cliente?.nome||'')+'</p></div>'+
+  '<div class="panel"><h3>🔧 Serviços e peças</h3><div class="tablewrap"><table><tr><th>Tipo</th><th>Item</th><th>Qtd.</th><th>Valor</th></tr>'+itens.map(x=>'<tr><td>'+esc(x.tipo)+'</td><td>'+esc(x.nome||'Item')+'</td><td>'+esc(x.qtd)+'</td><td>'+money(x.qtd*x.valor)+'</td></tr>').join('')+'</table></div><div class="total">Desconto: '+money(o.desconto)+'<br>TOTAL: '+money(o.total)+'</div></div>'+
+  '<div class="panel"><h3>📝 Diagnóstico / recomendações</h3><p>'+esc(o.diagnostico||'Nenhuma informação registrada.')+'</p><h3>Observações</h3><p>'+esc(o.observacoes||'Nenhuma observação registrada.')+'</p></div>'+
+  '<div class="panel"><h3>📸 Fotos do serviço</h3>'+(fotos.length?'<div class="publicPhotoGrid">'+fotos.map(x=>'<div class="publicPhoto"><img src="'+esc(x.arquivo_url)+'" alt="Foto do serviço"><div>'+esc(x.descricao||'Foto da OS')+'</div></div>').join('')+'</div>':'<p class="muted">Nenhuma foto salva na nuvem para esta OS.</p>')+'</div>'+approval+'<p class="muted" style="text-align:center;margin:20px 0">WR Garagem • Manutenção • Confiança • Performance</p>';
+}
+async function publicDecision(action,reason){try{if(!publicToken)return alert('Link inválido.');let r=await sb.rpc('respond_public_os',{p_token:publicToken,p_action:action,p_reason:reason||''});if(r.error)throw r.error;let o=r.data;if(!o)return alert('Não foi possível registrar a decisão.');o._token=publicToken;renderOS(o);alert(action==='aprovar'?'Orçamento aprovado com sucesso! A oficina já foi avisada.':'Orçamento recusado. A oficina já foi avisada.')}catch(e){alert('Não foi possível registrar a decisão: '+e.message)}}
+async function publicApprove(){if(!confirm('Confirmar aprovação deste orçamento?'))return;await publicDecision('aprovar','')}
+function publicReject(){let b=$('rejectBox');if(b)b.style.display='block'}
+async function confirmPublicReject(){await publicDecision('recusar',$('rejectReason')?.value||'')}
+initPublic();
+</script>
+</body></html>
