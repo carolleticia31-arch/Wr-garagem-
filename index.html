@@ -731,7 +731,7 @@ async function viewOS(id){
 function photoKey(id){return 'wr_garagem_os_photos_'+id}
 function getLocalPhotos(id){try{return JSON.parse(localStorage.getItem(photoKey(id))||'[]')}catch{return []}}
 function saveLocalPhotos(id,arr){localStorage.setItem(photoKey(id),JSON.stringify(arr))}
-async function loadCloudPhotos(id){try{let q=await sb.from('fotos_os').select('id,os_id,arquivo_url,descricao,storage_path,created_at').eq('os_id',id).order('created_at',{ascending:false});if(q.error)throw q.error;return q.data||[]}catch(e){console.warn('Erro ao carregar fotos da OS:',e);return []}}
+async function loadCloudPhotos(id){try{let q=await sb.from('fotos_os').select('id,os_id,arquivo_url,descricao,storage_path,created_at').eq('os_id',id).order('created_at',{ascending:false});if(q.error)throw q.error;let rows=q.data||[],paths=rows.map(x=>x.storage_path).filter(Boolean);if(paths.length){let s=await sb.storage.from('os-fotos').createSignedUrls(paths,3600);if(!s.error){let map=new Map((s.data||[]).map(x=>[x.path,x.signedUrl]));rows=rows.map(x=>({...x,arquivo_url:x.storage_path?map.get(x.storage_path)||x.arquivo_url:x.arquivo_url}))}}return rows}catch(e){console.warn('Erro ao carregar fotos da OS:',e);return []}}
 function photoStage(desc){
   const raw=String(desc||'').trim();
   const m=raw.match(/^(ANTES|DURANTE|DEPOIS)\s*[—-]\s*/i);
@@ -774,7 +774,7 @@ async function renderPhotos(id){
   g.innerHTML=`<div class="photoEvolution">${order.map(stage=>evolutionSectionHTML(stage,groups[stage],id)).join('')}</div>`;
 }
 function compressPhoto(file){return new Promise((resolve,reject)=>{let r=new FileReader();r.onload=()=>{let im=new Image();im.onload=()=>{let max=1400,w=im.width,h=im.height;if(w>max||h>max){let k=Math.min(max/w,max/h);w=Math.round(w*k);h=Math.round(h*k)}let c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);c.toBlob(b=>resolve(b),'image/jpeg',.72)};im.onerror=reject;im.src=r.result};r.onerror=reject;r.readAsDataURL(file)})}
-async function addOSPhotos(id,files){if(!files?.length)return;let ok=0,fail=[];for(const f of Array.from(files)){try{let blob=await compressPhoto(f),name=Date.now()+'_'+Math.random().toString(36).slice(2)+'.jpg',path=id+'/'+name;let up=await sb.storage.from('os-fotos').upload(path,blob,{contentType:'image/jpeg',upsert:false});if(up.error)throw up.error;let pub=sb.storage.from('os-fotos').getPublicUrl(path);if(!pub?.data?.publicUrl)throw new Error('Não foi possível gerar o endereço público da foto.');let categoria=prompt('Etapa da foto: digite ANTES, DURANTE ou DEPOIS.','DURANTE')||'DURANTE';categoria=String(categoria).trim().toUpperCase();if(!['ANTES','DURANTE','DEPOIS'].includes(categoria))categoria='DURANTE';let desc=prompt('Descrição da foto (opcional):','Foto da OS')||'Foto da OS';desc=categoria+' — '+desc;let ins=await sb.from('fotos_os').insert({os_id:id,arquivo_url:pub.data.publicUrl,descricao:desc,storage_path:path});if(ins.error)throw ins.error;ok++}catch(e){console.error('Falha ao salvar foto:',e);fail.push(f.name+': '+(e.message||'erro desconhecido'))}}if(ok)toast(ok+' foto(s) salva(s) na nuvem.');if(fail.length)alert('Não foi possível salvar '+fail.length+' foto(s) na nuvem.\n\n'+fail.join('\n'));await renderPhotos(id)}
+async function addOSPhotos(id,files){if(!files?.length)return;let ok=0,fail=[];for(const f of Array.from(files)){try{let blob=await compressPhoto(f),name=Date.now()+'_'+Math.random().toString(36).slice(2)+'.jpg',path=id+'/'+name;let up=await sb.storage.from('os-fotos').upload(path,blob,{contentType:'image/jpeg',upsert:false});if(up.error)throw up.error;let categoria=prompt('Etapa da foto: digite ANTES, DURANTE ou DEPOIS.','DURANTE')||'DURANTE';categoria=String(categoria).trim().toUpperCase();if(!['ANTES','DURANTE','DEPOIS'].includes(categoria))categoria='DURANTE';let desc=prompt('Descrição da foto (opcional):','Foto da OS')||'Foto da OS';desc=categoria+' — '+desc;let ins=await sb.from('fotos_os').insert({os_id:id,arquivo_url:null,descricao:desc,storage_path:path});if(ins.error)throw ins.error;ok++}catch(e){console.error('Falha ao salvar foto:',e);fail.push(f.name+': '+(e.message||'erro desconhecido'))}}if(ok)toast(ok+' foto(s) salva(s) na nuvem.');if(fail.length)alert('Não foi possível salvar '+fail.length+' foto(s) na nuvem.\n\n'+fail.join('\n'));await renderPhotos(id)}
 async function deleteCloudPhoto(id,pid,path){if(!confirm('Excluir esta foto?'))return;if(path)await sb.storage.from('os-fotos').remove([path]);let r=await sb.from('fotos_os').delete().eq('id',pid);if(r.error)toast('Erro ao excluir: '+r.error.message);await renderPhotos(id)}
 function deleteOSPhoto(id,i){let arr=getLocalPhotos(id);if(!confirm('Excluir esta foto?'))return;arr.splice(i,1);saveLocalPhotos(id,arr);renderPhotos(id)}
 async function sendForApproval(id){
@@ -787,8 +787,8 @@ async function sendForApproval(id){
     viewOS(id);
   }catch(e){alert('Não foi possível enviar para aprovação: '+e.message)}
 }
-async function shareClientOS(id){try{let q=await sb.from('ordens_servico').select('id,numero,public_token,clientes(nome,telefone)').eq('id',id).single();if(q.error)throw q.error;let o=q.data;let token=o.public_token;if(!token){if(window.crypto?.randomUUID)token=crypto.randomUUID().replace(/-/g,'');else{let a=new Uint8Array(24);crypto.getRandomValues(a);token=Array.from(a,b=>b.toString(16).padStart(2,'0')).join('')}let u=await sb.from('ordens_servico').update({public_token:token}).eq('id',id).eq('oficina_id',oficina.id);if(u.error)throw u.error}let cfg=getCfg();if(!cfg?.key)return alert('A Publishable Key não está configurada neste aparelho.');let link=location.origin+'/cliente.html?cliente='+encodeURIComponent(token)+'&k='+encodeURIComponent(cfg.key);let phone=String(o.clientes?.telefone||'').replace(/\D/g,'');if(phone.length<=11&&phone)phone='55'+phone;let msg='Olá! Aqui está o link para acompanhar sua Ordem de Serviço da WR Garagem: '+link;if(navigator.clipboard)try{await navigator.clipboard.writeText(link)}catch{}if(phone){window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank')}else alert('Link criado e copiado: '+link)}catch(e){alert('Não foi possível gerar o link: '+e.message)}}
-async function initPublic(){let p=new URLSearchParams(location.search),token=p.get('cliente'),key=p.get('k');if(!token||!key)return;document.body.classList.add('publicMode');$('nav').classList.add('hidden');$('loginModal').classList.add('hidden');$('logoutBtn').classList.add('hidden');$('userEmail').textContent='';sb=window.supabase.createClient('https://tywamxvzbwaogepldnuc.supabase.co',key);$('app').innerHTML='<div class="publicPage"><div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>Acompanhamento da Ordem de Serviço</h2><div class="muted">Carregando informações...</div></div></div>';try{let r=await sb.rpc('get_public_os',{p_token:token});if(r.error)throw r.error;let o=r.data;if(!o)return renderPublicError('Link inválido ou expirado.');o._token=token;renderPublicOS(o)}catch(e){console.error(e);renderPublicError('Não foi possível carregar esta OS.')} }
+async function shareClientOS(id){try{let q=await sb.from('ordens_servico').select('id,numero,public_token,clientes(nome,telefone)').eq('id',id).single();if(q.error)throw q.error;let o=q.data;let token=o.public_token;if(!token){if(window.crypto?.randomUUID)token=crypto.randomUUID().replace(/-/g,'');else{let a=new Uint8Array(24);crypto.getRandomValues(a);token=Array.from(a,b=>b.toString(16).padStart(2,'0')).join('')}let u=await sb.from('ordens_servico').update({public_token:token}).eq('id',id).eq('oficina_id',oficina.id);if(u.error)throw u.error}let cfg=getCfg();if(!cfg?.key)return alert('A Publishable Key não está configurada neste aparelho.');let link=location.origin+'/cliente-teste.html?cliente='+encodeURIComponent(token)+'&k='+encodeURIComponent(cfg.key);let phone=String(o.clientes?.telefone||'').replace(/\D/g,'');if(phone.length<=11&&phone)phone='55'+phone;let msg='Olá! Aqui está o link para acompanhar sua Ordem de Serviço da WR Garagem: '+link;if(navigator.clipboard)try{await navigator.clipboard.writeText(link)}catch{}if(phone){window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank')}else alert('Link criado e copiado: '+link)}catch(e){alert('Não foi possível gerar o link: '+e.message)}}
+async function initPublic(){let p=new URLSearchParams(location.search),token=p.get('cliente');if(!token)return;document.body.classList.add('publicMode');$('nav').classList.add('hidden');$('loginModal').classList.add('hidden');$('logoutBtn').classList.add('hidden');$('userEmail').textContent='';$('app').innerHTML='<div class="publicPage"><div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>Acompanhamento da Ordem de Serviço</h2><div class="muted">Carregando informações...</div></div></div>';try{let r=await fetch('https://tywamxvzbwaogepldnuc.supabase.co/functions/v1/portal-os?token='+encodeURIComponent(token));let data=await r.json();if(!r.ok)throw new Error(data?.error||'Não foi possível carregar esta OS.');if(!data)return renderPublicError('Link inválido ou expirado.');data._token=token;renderPublicOS(data)}catch(e){console.error(e);renderPublicError(e.message||'Não foi possível carregar esta OS.')} }
 function renderPublicError(msg){$('app').innerHTML='<div class="publicPage"><div class="panel"><h2>WR Garagem</h2><p>'+esc(msg)+'</p><p class="muted">Peça à oficina um novo link de acompanhamento.</p></div></div>'}
 function openPublicPhoto(url,caption){
   const old=$('publicPhotoLightbox');if(old)old.remove();
@@ -813,12 +813,7 @@ function renderPublicOS(o){
   let pecas=o.pecas||[],servicos=o.servicos||[],fotos=(o.fotos||[]).filter(x=>x&&x.arquivo_url),
       itens=[...pecas.map(x=>({tipo:'Peça',nome:x.nome,qtd:x.quantidade,valor:x.preco_unitario})),...servicos.map(x=>({tipo:'Serviço',nome:x.nome,qtd:x.quantidade,valor:x.preco_unitario}))];
   let decision=o.aprovacao_status||'Pendente';
-  let canDecide=['Aguardando aprovação','Orçamento'].includes(o.status||'');
-  let approvalBox=canDecide
-    ? '<div class="panel publicApproval" style="margin-top:14px"><h3>📋 Aprovação do orçamento</h3><p>Confira os serviços e valores acima. Você pode aprovar ou recusar este orçamento.</p><div class="row"><button class="primary" onclick="publicApprove()">'+
-      '✅ APROVAR ORÇAMENTO</button><button class="danger" onclick="publicReject()">'+
-      '❌ RECUSAR ORÇAMENTO</button></div><div id="rejectBox" style="display:none;margin-top:12px"><label>Motivo da recusa (opcional)</label><textarea id="rejectReason" rows="3" placeholder="Digite o motivo..."></textarea><button class="danger" style="margin-top:8px" onclick="confirmPublicReject()">Confirmar recusa</button></div></div>'
-    : '<div class="panel publicApproval" style="margin-top:14px"><h3>📋 Decisão do orçamento</h3><p><b>Status:</b> '+esc(decision)+'</p>'+(o.cliente_decisao_em?'<p class="muted">Registrado em: '+esc(new Date(o.cliente_decisao_em).toLocaleString('pt-BR'))+'</p>':'')+(o.cliente_recusa_motivo?'<p><b>Motivo:</b> '+esc(o.cliente_recusa_motivo)+'</p>':'')+'</div>';
+  let approvalBox='<div class="panel publicApproval" style="margin-top:14px"><h3>📋 Acompanhamento do orçamento</h3><p>Este portal é somente para consulta. Para aprovar, recusar ou solicitar alterações no orçamento, entre em contato diretamente com a WR Garagem.</p>'+(decision!=='Pendente'?'<p><b>Status:</b> '+esc(decision)+'</p>':'')+(o.cliente_decisao_em?'<p class="muted">Registrado em: '+esc(new Date(o.cliente_decisao_em).toLocaleString('pt-BR'))+'</p>':'')+(o.cliente_recusa_motivo?'<p><b>Motivo:</b> '+esc(o.cliente_recusa_motivo)+'</p>':'');
 
   window.publicOSToken=o._token||new URLSearchParams(location.search).get('cliente');
   $('app').innerHTML='<div class="publicPage"><div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>'+esc(o.oficina_nome||'WR Garagem')+'</h2><div class="muted">Acompanhamento da Ordem de Serviço '+esc(osLabel(o.numero))+'</div><div class="publicStatus">'+esc(o.status||'Orçamento')+'</div></div>'+
@@ -833,27 +828,6 @@ function renderPublicOS(o){
   '<div class="panel" style="margin-top:14px"><h3>📝 Diagnóstico / recomendações</h3><p>'+esc(o.diagnostico||'Nenhuma informação registrada.')+'</p><h3 style="margin-top:18px">Observações</h3><p>'+esc(o.observacoes||'Nenhuma observação registrada.')+'</p></div>'+
   '<div class="panel publicPhotoEvolution" style="margin-top:14px"><h3>📸 Evolução do serviço</h3><div class="muted">Acompanhe o serviço pelas etapas.</div>'+renderPublicPhotoEvolution(fotos)+'</div>'+
   approvalBox+'<p class="muted" style="text-align:center;margin:20px 0">WR Garagem • Manutenção • Confiança • Performance</p></div>';
-}
-async function publicApprove(){
-  if(!confirm('Confirmar aprovação deste orçamento?'))return;
-  await publicDecision('aprovar','');
-}
-function publicReject(){
-  let b=$('rejectBox'); if(b)b.style.display='block';
-}
-async function confirmPublicReject(){
-  await publicDecision('recusar',$('rejectReason')?.value||'');
-}
-async function publicDecision(action,reason){
-  try{
-    let token=window.publicOSToken||new URLSearchParams(location.search).get('cliente');
-    let r=await sb.rpc('respond_public_os',{p_token:token,p_action:action,p_reason:reason});
-    if(r.error)throw r.error;
-    let o=r.data;
-    if(!o)return alert('Não foi possível registrar a decisão.');
-    renderPublicOS(o);
-    alert(action==='aprovar'?'Orçamento aprovado com sucesso! A oficina já foi avisada.':'Orçamento recusado. A oficina já foi avisada.');
-  }catch(e){alert('Não foi possível registrar a decisão: '+e.message)}
 }
 async function updateOSStatus(id){let status=$('viewStatus')?.value||'',ent=$('viewEntrega')?.value||null,pag=$('viewPag')?.value||null,pago=numInput($('viewPago')?.value||0),venc=$('viewVenc')?.value||null;const current=data.ordens.find(x=>x.id===id)||{};const total=Number(current.total||0),pagoAtual=Math.max(0,Number(current.valor_pago||0));if(pago<0||pago>total+0.009)return alert('O valor recebido não pode ser negativo nem maior que o total da OS.');if(pago+0.009<pagoAtual)return alert('O valor recebido não pode ser reduzido por esta tela. Para registrar novos pagamentos, use “Registrar recebimento” no Financeiro.');const diferenca=Math.max(0,pago-pagoAtual),pagstatus=total>0&&pago>=total?'Pago':pago>0?'Parcial':'Em aberto';try{let r=await sb.from('ordens_servico').update({status,previsao_entrega:ent,forma_pagamento:pag,status_pagamento:pagstatus,valor_pago:pago,vencimento:venc}).eq('id',id).eq('oficina_id',oficina.id);if(r.error)throw r.error;if(diferenca>0){let l=await sb.from('lancamentos_financeiros').insert({oficina_id:oficina.id,os_id:id,tipo:'recebimento',valor:diferenca,data_lancamento:todayISO(),forma_pagamento:pag||current.forma_pagamento||'Outro',categoria:'Recebimento de OS',descricao:`Recebimento ${osLabel(current.numero)}`});if(l.error){await sb.from('ordens_servico').update({valor_pago:pagoAtual,status_pagamento:total>0&&pagoAtual>=total?'Pago':pagoAtual>0?'Parcial':'Em aberto'}).eq('id',id).eq('oficina_id',oficina.id);throw l.error}}data.ordens=await refresh('ordens_servico');toast('OS atualizada com sucesso!');viewOS(id)}catch(e){toast('Erro ao atualizar OS: '+e.message)}}
 function normalizeWhatsAppPhone(raw){
@@ -885,7 +859,7 @@ async function getClientPortalLink(id){
     let u=await sb.from('ordens_servico').update({public_token:token}).eq('id',id).eq('oficina_id',oficina.id);if(u.error)throw u.error;
   }
   let cfg=getCfg();if(!cfg?.key)throw new Error('A Publishable Key não está configurada neste aparelho.');
-  return location.origin+'/cliente.html?cliente='+encodeURIComponent(token)+'&k='+encodeURIComponent(cfg.key);
+  return location.origin+'/cliente-teste.html?cliente='+encodeURIComponent(token)+'&k='+encodeURIComponent(cfg.key);
 }
 function buildWhatsAppMessage(o,template,portalLink=''){
   const nome=o.clientes?.nome||'cliente';
