@@ -1,0 +1,103 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>WR Garagem — Acompanhamento</title><style>
+:root{--bg:#0d0f10;--panel:#151819;--line:#2b3032;--text:#f2f3f3;--muted:#9ba2a5;--accent:#d7a84b;--danger:#d85d5d}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+main{max-width:900px;margin:0 auto;padding:18px}.publicBrand{text-align:center;padding:18px 0}.publicBrand img{width:190px;max-width:70%;height:92px;object-fit:contain}.publicStatus{font-size:16px;padding:8px 12px;border-radius:999px;display:inline-block;background:#272b2c;margin:6px 0 14px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:14px}.muted{color:var(--muted);font-size:13px}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}th{color:#bfc4c6;background:#191c1d}td{color:#e8e9e9}.total{text-align:right;font-size:21px;font-weight:800;padding-top:14px}.publicPhotoGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}.publicPhoto{background:#151819;border:1px solid var(--line);border-radius:10px;overflow:hidden}.publicPhoto img{width:100%;height:180px;object-fit:cover;display:block}.publicPhoto div{padding:8px;font-size:12px;color:#ddd}.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:180px}button{cursor:pointer;border:0;border-radius:7px;padding:12px 14px;font-weight:700}.primary{background:var(--accent);color:#111}.danger{background:#5b2424;color:#fff;border:1px solid #8d3a3a!important}textarea{width:100%;padding:11px;border:1px solid #3a4042;border-radius:7px;background:#0f1112;color:#f1f2f2}.publicApproval{border-color:var(--accent)}
+</style>
+<style id="wr-v323-portal">
+.publicPhotoEvolutionSection{margin-top:16px}
+.publicPhotoEvolutionTitle{font-weight:850;font-size:15px;margin-bottom:9px}
+.photoEvolutionCount{color:var(--muted);font-weight:600;font-size:12px;margin-left:5px}
+.publicPhotoGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.publicPhoto{background:#151819;border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer}
+.publicPhoto img{width:100%;height:190px;object-fit:contain!important;background:#0b0d0e;display:block}
+.publicPhotoStage{padding:7px 8px 0!important;font-weight:800;font-size:11px!important;color:#f0f1f1!important}
+.publicPhotoCaption{padding:6px 8px 10px!important;font-size:12px!important;color:#ddd!important}
+.portalItemSection{margin-top:14px}
+.portalItemSection h3{margin-bottom:8px}
+.portalLightbox{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:16px}
+.portalLightbox img{max-width:96vw;max-height:84vh;width:auto;height:auto;object-fit:contain;background:#000;border-radius:8px}
+.portalLightbox .close{position:absolute;right:16px;top:14px;width:46px;height:46px;border-radius:50%;background:#222;color:#fff;border:1px solid #555;font-size:27px}
+.portalLightbox .caption{position:absolute;left:16px;right:16px;bottom:14px;text-align:center;color:#fff;font-size:13px}
+@media(max-width:650px){
+  .publicPhotoGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .publicPhoto img{height:150px}
+}
+</style>
+</head><body><main id="app"></main>
+<script>
+const SUPABASE_URL='https://tywamxvzbwaogepldnuc.supabase.co';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const osLabel=n=>'OS-'+String(Number(n)||0).padStart(5,'0');
+let sb=null, publicToken=null;
+function getPublicParams(){
+  let p=new URLSearchParams(location.search);
+  if(!p.get('cliente') && location.hash){p=new URLSearchParams(location.hash.replace(/^#/,'').replace(/^\?/,'') )}
+  return {token:p.get('cliente'),key:p.get('k')};
+}
+async function initPublic(){
+  const {token}=getPublicParams(); publicToken=token;
+  if(!token)return renderError('Link inválido ou incompleto.');
+  $('app').innerHTML='<div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>Acompanhamento da Ordem de Serviço</h2><div class="muted">Carregando informações...</div></div>';
+  try{
+    let r=await fetch(SUPABASE_URL+'/functions/v1/portal-os-v3?token='+encodeURIComponent(token));
+    let data=await r.json();
+    if(!r.ok)throw new Error(data?.error||'Não foi possível carregar esta OS.');
+    let o=data;
+    if(!o)return renderError('Link inválido ou expirado.');
+    o._token=token;
+    renderOS(o);
+  }catch(e){console.error(e);renderError(e.message||'Não foi possível carregar esta OS.');}
+}
+function renderError(msg){$('app').innerHTML='<div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>WR Garagem</h2></div><div class="panel"><h3>Não foi possível abrir a OS</h3><p>'+esc(msg)+'</p><p class="muted">Peça à oficina um novo link de acompanhamento.</p></div>'}
+
+function photoStage(desc){
+  const raw=String(desc||'').trim();
+  const m=raw.match(/^(ANTES|DURANTE|DEPOIS)\s*[—-]\s*/i);
+  return m?m[1].toUpperCase():'OUTRAS';
+}
+function photoDescription(desc){
+  const raw=String(desc||'Foto da OS').trim();
+  return raw.replace(/^(ANTES|DURANTE|DEPOIS)\s*[—-]\s*/i,'').trim()||'Foto da OS';
+}
+function photoStageTitle(stage){
+  return {ANTES:'🔵 ANTES DO SERVIÇO',DURANTE:'🟡 DURANTE O SERVIÇO',DEPOIS:'🟢 DEPOIS DO SERVIÇO',OUTRAS:'📷 OUTRAS FOTOS'}[stage]||stage;
+}
+function openPortalPhoto(url,caption){
+  const old=$('portalLightbox');if(old)old.remove();
+  const box=document.createElement('div');box.id='portalLightbox';box.className='portalLightbox';
+  box.innerHTML='<button class="close" aria-label="Fechar">×</button><img src="'+esc(url)+'" alt="'+esc(caption||'Foto do serviço')+'"><div class="caption">'+esc(caption||'Foto do serviço')+'</div>';
+  box.addEventListener('click',e=>{if(e.target===box||e.target.classList.contains('close'))box.remove()});
+  document.body.appendChild(box);
+}
+function renderPortalPhotos(fotos){
+  const groups={ANTES:[],DURANTE:[],DEPOIS:[],OUTRAS:[]};
+  (fotos||[]).forEach(x=>groups[photoStage(x.descricao)].push(x));
+  return ['ANTES','DURANTE','DEPOIS','OUTRAS'].map(stage=>{
+    const arr=groups[stage]||[]; if(!arr.length)return '';
+    return '<section class="publicPhotoEvolutionSection"><div class="publicPhotoEvolutionTitle">'+photoStageTitle(stage)+' <span class="photoEvolutionCount">'+arr.length+' foto'+(arr.length===1?'':'s')+'</span></div><div class="publicPhotoGrid">'+
+      arr.map(x=>{
+        const cap=photoDescription(x.descricao||'Foto da OS');
+        return '<div class="publicPhoto" role="button" tabindex="0" onclick="openPortalPhoto(\''+esc(x.arquivo_url)+'\',\''+esc(cap)+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \')openPortalPhoto(\''+esc(x.arquivo_url)+'\',\''+esc(cap)+'\')"><img src="'+esc(x.arquivo_url)+'" alt="'+esc(cap)+'"><div class="publicPhotoStage">'+esc(stage)+'</div><div class="publicPhotoCaption">'+esc(cap)+'</div></div>';
+      }).join('')+'</div></section>';
+  }).join('');
+}
+
+function renderOS(o){
+  publicToken=o._token||publicToken;
+  let pecas=o.pecas||[],servicos=o.servicos||[],fotos=(o.fotos||[]).filter(x=>x&&x.arquivo_url);
+  let itens=[...pecas.map(x=>({tipo:'Peça',nome:x.nome,qtd:x.quantidade,valor:x.preco_unitario})),...servicos.map(x=>({tipo:'Serviço',nome:x.nome,qtd:x.quantidade,valor:x.preco_unitario}))];
+  let decision=o.aprovacao_status||'Pendente';
+  let approval='<div class="panel publicApproval"><h3>📋 Acompanhamento do orçamento</h3><p>Este portal é somente para consulta. Para aprovar, recusar ou solicitar alterações no orçamento, entre em contato diretamente com a WR Garagem.</p>'+(decision!=='Pendente'?'<p><b>Status:</b> '+esc(decision)+'</p>':'')+(o.cliente_decisao_em?'<p class="muted">Registrado em: '+esc(new Date(o.cliente_decisao_em).toLocaleString('pt-BR'))+'</p>':'')+(o.cliente_recusa_motivo?'<p><b>Motivo:</b> '+esc(o.cliente_recusa_motivo)+'</p>':'')+'</div>';
+  $('app').innerHTML='<div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>'+esc(o.oficina_nome||'WR Garagem')+'</h2><div class="muted">Acompanhamento da Ordem de Serviço '+esc(osLabel(o.numero))+'</div><div class="publicStatus">'+esc(o.status||'Orçamento')+'</div></div>'+
+  '<div class="panel"><h3>🚗 Seu veículo</h3><p><b>'+esc([o.veiculo?.marca,o.veiculo?.modelo,o.veiculo?.ano].filter(Boolean).join(' '))+'</b></p><p>Placa: <b>'+esc(o.veiculo?.placa||'')+'</b> &nbsp; • &nbsp; KM: <b>'+esc(o.km_entrada||o.veiculo?.km||'')+'</b></p><p>Previsão de entrega: <b>'+esc(o.previsao_entrega||'A definir')+'</b></p></div>'+
+  '<div class="panel"><h3>👤 Cliente</h3><p>'+esc(o.cliente?.nome||'')+'</p></div>'+
+  '<div class="panel portalItemSection"><h3>🔩 PEÇAS / PRODUTOS</h3><div class="tablewrap"><table><tr><th>Peça</th><th>Qtd.</th><th>Valor</th></tr>'+ (pecas.length?pecas.map(x=>'<tr><td>'+esc(x.nome||'Peça')+'</td><td>'+esc(x.quantidade)+'</td><td>'+money(Number(x.quantidade||0)*Number(x.preco_unitario||0))+'</td></tr>').join(''):'<tr><td colspan="3" class="muted">Nenhuma peça adicionada.</td></tr>') +'</table></div><div class="total">Subtotal de peças: '+money(pecas.reduce((a,x)=>a+Number(x.quantidade||0)*Number(x.preco_unitario||0),0))+'</div></div>'+
+  '<div class="panel portalItemSection"><h3>🔧 SERVIÇOS</h3><div class="tablewrap"><table><tr><th>Serviço</th><th>Qtd.</th><th>Valor</th></tr>'+ (servicos.length?servicos.map(x=>'<tr><td>'+esc(x.nome||'Serviço')+'</td><td>'+esc(x.quantidade)+'</td><td>'+money(Number(x.quantidade||0)*Number(x.preco_unitario||0))+'</td></tr>').join(''):'<tr><td colspan="3" class="muted">Nenhum serviço adicionado.</td></tr>') +'</table></div><div class="total">Subtotal de serviços: '+money(servicos.reduce((a,x)=>a+Number(x.quantidade||0)*Number(x.preco_unitario||0),0))+'</div><div class="total" style="margin-top:10px">Desconto: '+money(o.desconto)+'<br>TOTAL: '+money(o.total)+'</div></div>'+
+  '<div class="panel"><h3>📝 Diagnóstico / recomendações</h3><p>'+esc(o.diagnostico||'Nenhuma informação registrada.')+'</p><h3>Observações</h3><p>'+esc(o.observacoes||'Nenhuma observação registrada.')+'</p></div>'+
+  '<div class="panel"><h3>📸 Evolução do serviço</h3><div class="muted">Toque em uma foto para abrir em tamanho maior.</div>'+(fotos.length?renderPortalPhotos(fotos):'<p class="muted">Nenhuma foto salva na nuvem para esta OS.</p>')+'</div>'+approval+'<p class="muted" style="text-align:center;margin:20px 0">WR Garagem • Manutenção • Confiança • Performance</p>';
+}
+initPublic();
+</script>
+</body></html>
