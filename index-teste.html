@@ -615,29 +615,46 @@ async function salvarEdicaoOS(id){
   if(!Number.isFinite(pago)||pago<0)return alert('Informe um valor recebido válido.');
   if(pago+0.009<pagoAnterior)return alert(`O valor recebido não pode ser reduzido abaixo do que já foi registrado (${money(pagoAnterior)}). Para estornar um pagamento, use o Financeiro.`);
   if(z.t+0.009<pago)return alert(`O valor recebido (${money(pago)}) não pode ser maior que o total da OS (${money(z.t)}).`);
-  for(const x of [...itemsP,...itemsS]){if(!String(x.nome||'').trim())return alert('Preencha o nome de todos os itens antes de salvar.');if(Number(x.qtd||0)<=0)return alert('A quantidade deve ser maior que zero.');if(Number(x.valor||0)<0)return alert('O valor não pode ser negativo.');}
+  for(const x of [...itemsP,...itemsS]){
+    if(!String(x.nome||'').trim())return alert('Preencha o nome de todos os itens antes de salvar.');
+    if(Number(x.qtd||0)<=0)return alert('A quantidade deve ser maior que zero.');
+    if(Number(x.valor||0)<0)return alert('O valor não pode ser negativo.');
+  }
   const formaSelecionada=$('eopag')?.value||'';
   const deltaRecebimento=Math.max(0,pago-pagoAnterior);
   if(deltaRecebimento>0&&!formaSelecionada)return alert('Selecione a forma de pagamento do novo recebimento.');
   try{
     for(const x of itemsP)x.ref=await ensureCatalogForItem('peca',x);
     for(const x of itemsS)x.ref=await ensureCatalogForItem('servico',x);
-    let statusPagamento=z.t<=0?'Em aberto':pago>=z.t?'Pago':pago>0?'Parcial':'Em aberto';$('eopagstatus').value=statusPagamento;let up=await sb.from('ordens_servico').update({status:$('eost').value,km_entrada:Number($('eokm').value||0),previsao_entrega:$('eoent').value||null,forma_pagamento:formaSelecionada||null,status_pagamento:statusPagamento,valor_pago:pago,vencimento:$('eovenc').value||null,diagnostico:$('eodiag').value,observacoes:$('eoobs').value,desconto:z.d,total:z.t}).eq('id',id).eq('oficina_id',oficina.id);
-    if(up.error)throw up.error;
-    if(deltaRecebimento>0){
-      let l=await sb.from('lancamentos_financeiros').insert({oficina_id:oficina.id,os_id:id,tipo:'recebimento',valor:deltaRecebimento,data_lancamento:todayISO(),forma_pagamento:formaSelecionada,categoria:'Recebimento de OS',descricao:`Recebimento ${osLabel(q.data.numero)}`});
-      if(l.error){await sb.from('ordens_servico').update({valor_pago:pagoAnterior,status_pagamento:z.t>0&&pagoAnterior>=z.t?'Pago':pagoAnterior>0?'Parcial':'Em aberto'}).eq('id',id).eq('oficina_id',oficina.id);throw l.error}
-    }else if(pagoAnterior>0&&formaSelecionada&&formaSelecionada!==q.data.forma_pagamento){
-      let l=await sb.from('lancamentos_financeiros').select('id').eq('oficina_id',oficina.id).eq('os_id',id).eq('tipo','recebimento').order('data_lancamento',{ascending:false}).order('created_at',{ascending:false}).limit(1);
-      if(l.error)throw l.error;
-      if(l.data?.[0]){let u=await sb.from('lancamentos_financeiros').update({forma_pagamento:formaSelecionada}).eq('id',l.data[0].id).eq('oficina_id',oficina.id);if(u.error)throw u.error}
-    }
-    let dp=await sb.from('os_pecas').delete().eq('os_id',id);if(dp.error)throw dp.error;
-    let ds=await sb.from('os_servicos').delete().eq('os_id',id);if(ds.error)throw ds.error;
-    if(itemsP.length){let r=await sb.from('os_pecas').insert(itemsP.map(x=>({os_id:id,peca_id:x.ref,quantidade:Number(x.qtd),preco_unitario:Number(x.valor),desconto:0})));if(r.error)throw r.error}
-    if(itemsS.length){let r=await sb.from('os_servicos').insert(itemsS.map(x=>({os_id:id,servico_id:x.ref,quantidade:Number(x.qtd),preco_unitario:Number(x.valor),desconto:0})));if(r.error)throw r.error}
-    data.ordens=await refresh('ordens_servico');toast(osLabel(q.data.numero)+' atualizada com sucesso!');viewOS(id);
-  }catch(e){console.error(e);toast('Erro ao salvar alterações: '+(e?.message||String(e)))}
+
+    let statusPagamento=z.t<=0?'Em aberto':pago>=z.t?'Pago':pago>0?'Parcial':'Em aberto';
+    $('eopagstatus').value=statusPagamento;
+
+    const {data:rpcData,error:rpcError}=await sb.rpc('editar_os_atomico_v1',{
+      p_os_id:id,
+      p_status:$('eost').value,
+      p_km_entrada:Number($('eokm').value||0),
+      p_previsao_entrega:$('eoent').value||null,
+      p_forma_pagamento:formaSelecionada||null,
+      p_status_pagamento:statusPagamento,
+      p_valor_pago:pago,
+      p_vencimento:$('eovenc').value||null,
+      p_diagnostico:$('eodiag').value,
+      p_observacoes:$('eoobs').value,
+      p_desconto:z.d,
+      p_total:z.t,
+      p_pecas:itemsP.map(x=>({peca_id:x.ref,quantidade:Number(x.qtd),preco_unitario:Number(x.valor),desconto:0})),
+      p_servicos:itemsS.map(x=>({servico_id:x.ref,quantidade:Number(x.qtd),preco_unitario:Number(x.valor),desconto:0}))
+    });
+    if(rpcError)throw rpcError;
+
+    data.ordens=await refresh('ordens_servico');
+    toast(osLabel(q.data.numero)+' atualizada com sucesso!');
+    viewOS(id);
+  }catch(e){
+    console.error(e);
+    toast('Erro ao salvar alterações: '+(e?.message||String(e)));
+  }
 }
 function osPaymentInfo(o){
   const total=Math.max(0,Number(o?.total||0));
@@ -787,7 +804,7 @@ async function sendForApproval(id){
     viewOS(id);
   }catch(e){alert('Não foi possível enviar para aprovação: '+e.message)}
 }
-async function shareClientOS(id){try{let q=await sb.from('ordens_servico').select('id,numero,public_token,clientes(nome,telefone)').eq('id',id).single();if(q.error)throw q.error;let o=q.data;let token=o.public_token;if(!token){if(window.crypto?.randomUUID)token=crypto.randomUUID().replace(/-/g,'');else{let a=new Uint8Array(24);crypto.getRandomValues(a);token=Array.from(a,b=>b.toString(16).padStart(2,'0')).join('')}let u=await sb.from('ordens_servico').update({public_token:token}).eq('id',id).eq('oficina_id',oficina.id);if(u.error)throw u.error}let cfg=getCfg();if(!cfg?.key)return alert('A Publishable Key não está configurada neste aparelho.');let link=location.origin+'/cliente-teste.html?cliente='+encodeURIComponent(token)+'&k='+encodeURIComponent(cfg.key);let phone=String(o.clientes?.telefone||'').replace(/\D/g,'');if(phone.length<=11&&phone)phone='55'+phone;let msg='Olá! Aqui está o link para acompanhar sua Ordem de Serviço da WR Garagem: '+link;if(navigator.clipboard)try{await navigator.clipboard.writeText(link)}catch{}if(phone){window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank')}else alert('Link criado e copiado: '+link)}catch(e){alert('Não foi possível gerar o link: '+e.message)}}
+async function shareClientOS(id){try{let q=await sb.from('ordens_servico').select('id,numero,public_token,clientes(nome,telefone)').eq('id',id).single();if(q.error)throw q.error;let o=q.data;let token=o.public_token;if(!token){if(window.crypto?.randomUUID)token=crypto.randomUUID().replace(/-/g,'');else{let a=new Uint8Array(24);crypto.getRandomValues(a);token=Array.from(a,b=>b.toString(16).padStart(2,'0')).join('')}let u=await sb.from('ordens_servico').update({public_token:token}).eq('id',id).eq('oficina_id',oficina.id);if(u.error)throw u.error}let cfg=getCfg();if(!cfg?.key)return alert('A Publishable Key não está configurada neste aparelho.');let link=location.origin+'/cliente.html?cliente='+encodeURIComponent(token)+'&k='+encodeURIComponent(cfg.key);let phone=String(o.clientes?.telefone||'').replace(/\D/g,'');if(phone.length<=11&&phone)phone='55'+phone;let msg='Olá! Aqui está o link para acompanhar sua Ordem de Serviço da WR Garagem: '+link;if(navigator.clipboard)try{await navigator.clipboard.writeText(link)}catch{}if(phone){window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank')}else alert('Link criado e copiado: '+link)}catch(e){alert('Não foi possível gerar o link: '+e.message)}}
 async function initPublic(){let p=new URLSearchParams(location.search),token=p.get('cliente');if(!token)return;document.body.classList.add('publicMode');$('nav').classList.add('hidden');$('loginModal').classList.add('hidden');$('logoutBtn').classList.add('hidden');$('userEmail').textContent='';$('app').innerHTML='<div class="publicPage"><div class="publicBrand"><img src="logo-wr-garagem.png" alt="WR Garagem"><h2>Acompanhamento da Ordem de Serviço</h2><div class="muted">Carregando informações...</div></div></div>';try{let r=await fetch('https://tywamxvzbwaogepldnuc.supabase.co/functions/v1/portal-os?token='+encodeURIComponent(token));let data=await r.json();if(!r.ok)throw new Error(data?.error||'Não foi possível carregar esta OS.');if(!data)return renderPublicError('Link inválido ou expirado.');data._token=token;renderPublicOS(data)}catch(e){console.error(e);renderPublicError(e.message||'Não foi possível carregar esta OS.')} }
 function renderPublicError(msg){$('app').innerHTML='<div class="publicPage"><div class="panel"><h2>WR Garagem</h2><p>'+esc(msg)+'</p><p class="muted">Peça à oficina um novo link de acompanhamento.</p></div></div>'}
 function openPublicPhoto(url,caption){
@@ -859,7 +876,7 @@ async function getClientPortalLink(id){
     let u=await sb.from('ordens_servico').update({public_token:token}).eq('id',id).eq('oficina_id',oficina.id);if(u.error)throw u.error;
   }
   let cfg=getCfg();if(!cfg?.key)throw new Error('A Publishable Key não está configurada neste aparelho.');
-  return location.origin+'/cliente-teste.html?cliente='+encodeURIComponent(token)+'&k='+encodeURIComponent(cfg.key);
+  return location.origin+'/cliente.html?cliente='+encodeURIComponent(token)+'&k='+encodeURIComponent(cfg.key);
 }
 function buildWhatsAppMessage(o,template,portalLink=''){
   const nome=o.clientes?.nome||'cliente';
