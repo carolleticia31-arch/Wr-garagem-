@@ -724,7 +724,7 @@ async function financeiro(){
     const o=typeof oOrId==='object' ? (oOrId||{}) : (data.ordens.find(x=>x.id===oOrId)||{});
     const id=o.id||'';
     const text=esc(osLabel(o.numero||'—'));
-    return id?`<button type=\"button\" class=\"financeOsLink\" onclick=\"abrirOSFinanceiro('${id}')\">${text}</button>`:text;
+    return id?`<button type=\"button\" class=\"financeOsLink\" onclick=\"abrirOSFinanceiro('\${id}')\">\${text}</button>`:text;
   };
   const formaRecebimento=l=>l.forma_pagamento||data.ordens.find(o=>o.id===l.os_id)?.forma_pagamento||'—';
   const escRowsEmpty=(cols,msg)=>`<tr><td colspan="${cols}" class="muted">${msg}</td></tr>`;

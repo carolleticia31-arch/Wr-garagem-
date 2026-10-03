@@ -1,4 +1,4 @@
-<!-- WR Garagem V32.30 - OS clicável nos detalhes do saldo -->
+<!-- WR Garagem V32.29 - financeiro por mês + cards clicáveis + detalhamento -->
 <!-- WR Garagem V32.28 - recebido e a receber separados por categoria -->
 <!-- WR Garagem V32.27 - link da OS em andamento e pronto -->
 <!-- WR Garagem V32.26.1 - cobrança Pix + link da OS -->
@@ -65,8 +65,7 @@ body.menu-open{overflow:hidden}
 @media print{.sigGrid{grid-template-columns:1fr 1fr!important;gap:50px!important}.sigBox{color:#111!important;min-height:55px}.printHeader{gap:14px}.osLogo{width:190px;height:92px}}
 
 .publicPage{max-width:900px;margin:0 auto;padding:18px}.publicBrand{text-align:center;padding:18px 0}.publicBrand img{width:190px;max-width:70%;height:92px;object-fit:contain}.publicStatus{font-size:16px;padding:8px 12px;border-radius:999px;display:inline-block;background:#272b2c;margin:6px 0 14px}.publicPhotoGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}.publicPhoto{background:#151819;border:1px solid var(--line);border-radius:10px;overflow:hidden}.publicPhoto img{width:100%;height:180px;object-fit:cover;display:block}.publicPhoto div{padding:8px;font-size:12px;color:#ddd}.photoGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}.photoCard{border:1px solid #333;border-radius:10px;overflow:hidden;background:#151819}.photoCard img{width:100%;height:130px;object-fit:cover;display:block}.photoMeta{padding:8px;font-size:12px}.photoActions{display:flex;gap:6px;padding:0 8px 8px}.photoInput{display:none}
-\n.financeClickable{cursor:pointer;transition:transform .12s ease,border-color .12s ease,background .12s ease}.financeClickable:hover{transform:translateY(-1px);border-color:rgba(215,168,75,.55);background:#191c1d}.financeClickable:active{transform:translateY(0)}\n.financePeriodPanel{margin-top:2px}.financePeriodPanel select{min-width:190px}.financeMonthRow{cursor:pointer}.financeMonthRow:hover{background:#1b1e20}.financeDetailModal{width:min(980px,100%);max-height:86vh;overflow:auto}.financeDetailTable{max-height:65vh;overflow:auto}.financeDetailTable table{width:100%;min-width:620px;border-collapse:collapse}.financeDetailTable th,.financeDetailTable td{padding:10px 9px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}.financeDetailTable th{color:#cdd1d2;font-weight:800;position:sticky;top:0;background:#151819}.financeDetailTotal td{font-weight:800;border-top:1px solid #4a4f51;background:#1b1e1f}.financeDetailModal .sectionTitle{position:sticky;top:0;background:#151819;padding-bottom:10px;z-index:2}
-.financeOsLink{background:none;border:0;padding:0;color:#e8c66a;font:inherit;font-weight:800;text-decoration:underline;cursor:pointer}.financeOsLink:hover{opacity:.85}.financeOsLink:active{opacity:.7}\n@media(max-width:700px){.financePeriodPanel .sectionTitle{align-items:flex-start;flex-direction:column}.financePeriodPanel select{width:100%;min-width:0}.financeDetailModal{padding:14px}.financeDetailTable{margin:0 -2px}.financeDetailTable table{min-width:600px}}\n</style>
+\n.financeClickable{cursor:pointer;transition:transform .12s ease,border-color .12s ease,background .12s ease}.financeClickable:hover{transform:translateY(-1px);border-color:rgba(215,168,75,.55);background:#191c1d}.financeClickable:active{transform:translateY(0)}\n.financePeriodPanel{margin-top:2px}.financePeriodPanel select{min-width:190px}.financeMonthRow{cursor:pointer}.financeMonthRow:hover{background:#1b1e20}.financeDetailModal{width:min(980px,100%);max-height:86vh;overflow:auto}.financeDetailTable{max-height:65vh;overflow:auto}.financeDetailTable table{width:100%;min-width:620px;border-collapse:collapse}.financeDetailTable th,.financeDetailTable td{padding:10px 9px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}.financeDetailTable th{color:#cdd1d2;font-weight:800;position:sticky;top:0;background:#151819}.financeDetailTotal td{font-weight:800;border-top:1px solid #4a4f51;background:#1b1e1f}.financeDetailModal .sectionTitle{position:sticky;top:0;background:#151819;padding-bottom:10px;z-index:2}\n@media(max-width:700px){.financePeriodPanel .sectionTitle{align-items:flex-start;flex-direction:column}.financePeriodPanel select{width:100%;min-width:0}.financeDetailModal{padding:14px}.financeDetailTable{margin:0 -2px}.financeDetailTable table{min-width:600px}}\n</style>
 
 <style id="wr-os-table-final">
 /* Tela do aplicativo — somente a tabela de itens da OS */
@@ -640,10 +639,6 @@ async function servicos(){
   }
 }
 async 
-async function abrirOSFinanceiro(id){
-  document.querySelectorAll('.modal').forEach(m=>m.remove());
-  if(typeof viewOS==='function')await viewOS(id);
-}
 async function financeiro(){
   if(!(await ensureConnection()))return;
   let despesas=[],recebimentosLedger=[];
@@ -720,12 +715,6 @@ async function financeiro(){
   const saldoMes=recebidoMes-despesasMes;
 
   const clienteNome=o=>data.clientes.find(c=>c.id===o?.cliente_id)?.nome||'—';
-  const osLink=(oOrId)=>{
-    const o=typeof oOrId==='object' ? (oOrId||{}) : (data.ordens.find(x=>x.id===oOrId)||{});
-    const id=o.id||'';
-    const text=esc(osLabel(o.numero||'—'));
-    return id?`<button type=\"button\" class=\"financeOsLink\" onclick=\"abrirOSFinanceiro('${id}')\">${text}</button>`:text;
-  };
   const formaRecebimento=l=>l.forma_pagamento||data.ordens.find(o=>o.id===l.os_id)?.forma_pagamento||'—';
   const escRowsEmpty=(cols,msg)=>`<tr><td colspan="${cols}" class="muted">${msg}</td></tr>`;
   const modalTabela=(titulo,sub,html)=>{
@@ -734,33 +723,33 @@ async function financeiro(){
   };
   const abrirDetalhes=tipo=>{
     if(tipo==='faturado'){
-      const rows=faturamentoMesOS.map(o=>{const c=categoriasOS(o);return `<tr><td>${osLink(o)}</td><td>${esc(clienteNome(o))}</td><td>${money(c.pecas)}</td><td>${money(c.servicos)}</td><td>${money(c.total)}</td></tr>`}).join('')||escRowsEmpty(5,'Nenhuma OS faturada neste mês.');
+      const rows=faturamentoMesOS.map(o=>{const c=categoriasOS(o);return `<tr><td>${esc(osLabel(o.numero))}</td><td>${esc(clienteNome(o))}</td><td>${money(c.pecas)}</td><td>${money(c.servicos)}</td><td>${money(c.total)}</td></tr>`}).join('')||escRowsEmpty(5,'Nenhuma OS faturada neste mês.');
       modalTabela('💰 Faturamento — '+monthLabel(mesSelecionado),'OS não canceladas criadas no mês selecionado',`<table><tr><th>OS</th><th>Cliente</th><th>Peças</th><th>Serviços</th><th>Total</th></tr>${rows}<tr class="financeDetailTotal"><td colspan="4">Total faturado</td><td>${money(faturadoMes)}</td></tr></table>`);return;
     }
     if(tipo==='recebido'){
-      const rows=recebimentosLedger.map(l=>{const o=data.ordens.find(x=>x.id===l.os_id)||{};return `<tr><td>${esc(l.data_lancamento||'—')}</td><td>${osLink(o)}</td><td>${esc(clienteNome(o))}</td><td>${money(l.valor)}</td><td>${esc(formaRecebimento(l))}</td></tr>`}).join('')||escRowsEmpty(5,'Nenhum lançamento de recebimento encontrado.');
+      const rows=recebimentosLedger.map(l=>{const o=data.ordens.find(x=>x.id===l.os_id)||{};return `<tr><td>${esc(l.data_lancamento||'—')}</td><td>${esc(osLabel(o.numero||'—'))}</td><td>${esc(clienteNome(o))}</td><td>${money(l.valor)}</td><td>${esc(formaRecebimento(l))}</td></tr>`}).join('')||escRowsEmpty(5,'Nenhum lançamento de recebimento encontrado.');
       modalTabela('💵 Recebido','Todos os lançamentos registrados no financeiro',`<table><tr><th>Data</th><th>OS</th><th>Cliente</th><th>Valor</th><th>Forma</th></tr>${rows}<tr class="financeDetailTotal"><td colspan="3">Total</td><td>${money(recebimentosLedger.reduce((s,x)=>s+Number(x.valor||0),0))}</td><td></td></tr></table>`);return;
     }
     if(tipo==='aReceber'){
-      const rows=pendentes.map(o=>{const saldo=Math.max(0,Number(o.total||0)-Number(o.valor_pago||0));return `<tr><td>${osLink(o)}</td><td>${esc(clienteNome(o))}</td><td>${money(o.total)}</td><td>${money(o.valor_pago)}</td><td>${money(saldo)}</td><td>${esc(o.vencimento||'—')}</td></tr>`}).join('')||escRowsEmpty(6,'Nenhuma conta em aberto.');
+      const rows=pendentes.map(o=>{const saldo=Math.max(0,Number(o.total||0)-Number(o.valor_pago||0));return `<tr><td>${esc(osLabel(o.numero))}</td><td>${esc(clienteNome(o))}</td><td>${money(o.total)}</td><td>${money(o.valor_pago)}</td><td>${money(saldo)}</td><td>${esc(o.vencimento||'—')}</td></tr>`}).join('')||escRowsEmpty(6,'Nenhuma conta em aberto.');
       modalTabela('🧾 A receber','Saldos em aberto das OS não canceladas',`<table><tr><th>OS</th><th>Cliente</th><th>Total</th><th>Recebido</th><th>Saldo</th><th>Vencimento</th></tr>${rows}<tr class="financeDetailTotal"><td colspan="4">Total a receber</td><td>${money(aReceber)}</td><td></td></tr></table>`);return;
     }
     if(tipo==='vencidas'){
-      const rows=vencidas.map(o=>{const saldo=Math.max(0,Number(o.total||0)-Number(o.valor_pago||0));const dias=Math.max(0,Math.floor((hoje-new Date(o.vencimento+'T23:59:59'))/86400000));return `<tr><td>${osLink(o)}</td><td>${esc(clienteNome(o))}</td><td>${esc(o.vencimento)}</td><td>${dias} dia(s)</td><td>${money(saldo)}</td></tr>`}).join('')||escRowsEmpty(5,'Nenhuma conta vencida.');
+      const rows=vencidas.map(o=>{const saldo=Math.max(0,Number(o.total||0)-Number(o.valor_pago||0));const dias=Math.max(0,Math.floor((hoje-new Date(o.vencimento+'T23:59:59'))/86400000));return `<tr><td>${esc(osLabel(o.numero))}</td><td>${esc(clienteNome(o))}</td><td>${esc(o.vencimento)}</td><td>${dias} dia(s)</td><td>${money(saldo)}</td></tr>`}).join('')||escRowsEmpty(5,'Nenhuma conta vencida.');
       modalTabela('🔴 Contas vencidas','Pendências com vencimento anterior a hoje',`<table><tr><th>OS</th><th>Cliente</th><th>Vencimento</th><th>Atraso</th><th>Saldo</th></tr>${rows}</table>`);return;
     }
     if(tipo==='recebidoMes'){
-      const rows=recebimentosLedger.filter(x=>isMes(x.data_lancamento)).map(l=>{const o=data.ordens.find(x=>x.id===l.os_id)||{};return `<tr><td>${esc(l.data_lancamento||'—')}</td><td>${osLink(o)}</td><td>${esc(clienteNome(o))}</td><td>${money(l.valor)}</td><td>${esc(formaRecebimento(l))}</td></tr>`}).join('')||escRowsEmpty(5,'Nenhum recebimento neste mês.');
+      const rows=recebimentosLedger.filter(x=>isMes(x.data_lancamento)).map(l=>{const o=data.ordens.find(x=>x.id===l.os_id)||{};return `<tr><td>${esc(l.data_lancamento||'—')}</td><td>${esc(osLabel(o.numero||'—'))}</td><td>${esc(clienteNome(o))}</td><td>${money(l.valor)}</td><td>${esc(formaRecebimento(l))}</td></tr>`}).join('')||escRowsEmpty(5,'Nenhum recebimento neste mês.');
       modalTabela('📥 Recebido — '+monthLabel(mesSelecionado),'Lançamentos pela data do recebimento',`<table><tr><th>Data</th><th>OS</th><th>Cliente</th><th>Valor</th><th>Forma</th></tr>${rows}<tr class="financeDetailTotal"><td colspan="3">Total do mês</td><td>${money(recebidoMes)}</td><td></td></tr></table>`);return;
     }
     if(tipo==='despesasMes'){
-      const rows=despesas.filter(x=>isMes(x.data_lancamento)).map(x=>{const o=x.os_id?data.ordens.find(o=>o.id===x.os_id):null;const origem=o?osLink(o):esc(x.categoria||'—');return `<tr><td>${esc(x.data_lancamento||'—')}</td><td>${origem}</td><td>${esc(x.descricao||'—')}</td><td>${esc(x.forma_pagamento||'—')}</td><td>${money(x.valor)}</td></tr>`}).join('')||escRowsEmpty(5,'Nenhuma despesa neste mês.');
+      const rows=despesas.filter(x=>isMes(x.data_lancamento)).map(x=>`<tr><td>${esc(x.data_lancamento||'—')}</td><td>${esc(x.categoria||'—')}</td><td>${esc(x.descricao||'—')}</td><td>${esc(x.forma_pagamento||'—')}</td><td>${money(x.valor)}</td></tr>`).join('')||escRowsEmpty(5,'Nenhuma despesa neste mês.');
       modalTabela('📤 Despesas — '+monthLabel(mesSelecionado),'Lançamentos pela data da despesa',`<table><tr><th>Data</th><th>Categoria</th><th>Descrição</th><th>Forma</th><th>Valor</th></tr>${rows}<tr class="financeDetailTotal"><td colspan="4">Total do mês</td><td>${money(despesasMes)}</td></tr></table>`);return;
     }
     if(tipo==='saldoMes'){
       const rec=recebimentosLedger.filter(x=>isMes(x.data_lancamento));
       const desp=despesas.filter(x=>isMes(x.data_lancamento));
-      const recRows=rec.map(l=>{const o=data.ordens.find(x=>x.id===l.os_id)||{};const osCell=osLink(o.id?o:(l.os_id||''));return `<tr><td>📥</td><td>${esc(l.data_lancamento||'—')}</td><td>${osCell}</td><td>${esc(clienteNome(o))}</td><td>${money(l.valor)}</td></tr>`}).join('');
+      const recRows=rec.map(l=>{const o=data.ordens.find(x=>x.id===l.os_id)||{};return `<tr><td>📥</td><td>${esc(l.data_lancamento||'—')}</td><td>${esc(osLabel(o.numero||'—'))}</td><td>${esc(clienteNome(o))}</td><td>${money(l.valor)}</td></tr>`}).join('');
       const despRows=desp.map(x=>`<tr><td>📤</td><td>${esc(x.data_lancamento||'—')}</td><td>${esc(x.categoria||'—')}</td><td>${esc(x.descricao||'—')}</td><td>-${money(x.valor)}</td></tr>`).join('');
       modalTabela('📊 Saldo — '+monthLabel(mesSelecionado),'Entradas menos despesas do mês selecionado',`<table><tr><th></th><th>Data</th><th>OS/Categoria</th><th>Cliente/Descrição</th><th>Valor</th></tr>${recRows}${despRows}${!recRows&&!despRows?escRowsEmpty(5,'Nenhum lançamento neste mês.'):''}<tr class="financeDetailTotal"><td colspan="4">Recebimentos</td><td>${money(recebidoMes)}</td></tr><tr class="financeDetailTotal"><td colspan="4">Despesas</td><td>- ${money(despesasMes)}</td></tr><tr class="financeDetailTotal"><td colspan="4">Saldo do mês</td><td>${money(saldoMes)}</td></tr></table>`);
     }
