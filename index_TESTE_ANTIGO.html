@@ -12,6 +12,7 @@
 <!-- WR Garagem V32.14 — criação atômica de OS -->
 <!-- WR Garagem V32.20 — redesign visual inspirado na referência aprovada; lógica preservada -->
 <!-- WR Garagem V32.22 — pacote final de acabamento mobile + ações de cadastro -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#0d0f10;--panel:#151819;--panel2:#1b1e1f;--line:#2b3032;--text:#f2f3f3;--muted:#9ba2a5;--accent:#d7a84b;--green:#20b26b;--danger:#d85d5d}*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}button,input,select,textarea{font:inherit}button{cursor:pointer}header{height:68px;background:#090a0b;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;position:sticky;top:0;z-index:10}header h1{margin:0;font-size:21px;letter-spacing:.2px}header small{color:var(--muted)}.brand{display:flex;gap:10px;align-items:center}.logo{width:38px;height:38px;border:1px solid #4a4f51;border-radius:9px;display:grid;place-items:center;color:var(--accent);font-weight:800}.userbar{display:flex;gap:10px;align-items:center}.wrap{display:flex;min-height:calc(100vh - 68px)}nav{width:225px;background:#101213;border-right:1px solid var(--line);padding:12px;flex:none}nav button{display:block;width:100%;padding:12px 13px;margin:4px 0;border:0;background:transparent;color:#cdd1d2;text-align:left;border-radius:8px}nav button.active,nav button:hover{background:#1b1e20;color:white}main{flex:1;padding:22px;max-width:1500px;margin:auto;width:100%}h2{margin:0 0 16px}h3{margin:0 0 12px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card,.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}.card b{display:block;font-size:25px;margin-top:7px}.muted{color:var(--muted);font-size:13px}.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1;min-width:160px}.field{margin-bottom:12px}label{display:block;font-size:12px;font-weight:700;color:#cdd1d2;margin-bottom:6px}input,select,textarea{width:100%;padding:11px 12px;border:1px solid #3a4042;border-radius:7px;background:#0f1112;color:#f1f2f2;outline:none}input:focus,select:focus,textarea:focus{border-color:#7f8588}textarea{min-height:100px;resize:vertical}.primary,.secondary,.danger,.ghost{border:0;border-radius:7px;padding:10px 14px;font-weight:700}.primary{background:var(--accent);color:#111}.secondary{background:#2b3032;color:#fff}.danger{background:#552b2b;color:#ffd8d8}.ghost{background:transparent;color:#ddd;border:1px solid var(--line)}table{width:100%;border-collapse:collapse;overflow:hidden}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}th{color:#bfc4c6;background:#191c1d}td{color:#e8e9e9}.tablewrap{overflow:auto}.total{text-align:right;font-size:21px;font-weight:800;padding-top:14px}.status{display:inline-block;padding:5px 8px;border-radius:99px;background:#272b2c;font-size:11px}.empty{padding:22px;text-align:center;color:var(--muted)}.hidden{display:none!important}.modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;padding:18px;z-index:50}.modalbox{width:min(520px,100%);background:#151819;border:1px solid #363b3d;border-radius:14px;padding:20px}.notice{background:#211f18;border:1px solid #4c4127;color:#e8d49e;padding:11px;border-radius:8px;font-size:13px;margin-bottom:14px}.toast{position:fixed;right:18px;bottom:18px;background:#202526;border:1px solid #3b4143;padding:12px 14px;border-radius:8px;z-index:80}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.dangerText{color:#ff9b9b}.hideMobile{display:block}@media(max-width:800px){
@@ -1161,7 +1162,7 @@ async function viewOS(id){
   const paymentClass='osPaymentCard '+pay.key;
   const paymentStatus=`<div class="osPaymentStatus ${pay.key}">${pay.icon} <strong>${pay.label}</strong></div>`;
   $('app').innerHTML=`
-  <div class="noPrint osTopActions"><button class="secondary" onclick="historico()">← Voltar</button><div class="osActionGroup"><div class="osActionGroupLabel">AÇÕES PRINCIPAIS</div><div class="osActionMain"><button class="primary" onclick="editarOS('${o.id}')">✏️ Editar</button><button class="primary" onclick="openWhatsAppComposer('${o.id}')">📱 WhatsApp</button><button class="primary" onclick="printOS()">📄 PDF</button></div><div class="osActionSecondaryWrap"><div class="osActionGroupLabel">OUTRAS AÇÕES</div><div class="osActionSecondary"><button class="secondary" onclick="sendForApproval('${o.id}')">✅ Aprovação</button><button class="secondary" onclick="shareClientOS('${o.id}')">🔗 Link do cliente</button><button class="danger" onclick="excluirOS('${o.id}')">🗑️ Excluir</button></div></div></div>
+  <div class="noPrint osTopActions"><button class="secondary" onclick="historico()">← Voltar</button><div class="osActionGroup"><div class="osActionGroupLabel">AÇÕES PRINCIPAIS</div><div class="osActionMain"><button class="primary" onclick="editarOS('${o.id}')">✏️ Editar</button><button class="primary" onclick="openWhatsAppComposer('${o.id}')">📱 WhatsApp</button><button class="primary" onclick="openOSPdfAction()">📄 PDF</button></div><div class="osActionSecondaryWrap"><div class="osActionGroupLabel">OUTRAS AÇÕES</div><div class="osActionSecondary"><button class="secondary" onclick="sendForApproval('${o.id}')">✅ Aprovação</button><button class="secondary" onclick="shareClientOS('${o.id}')">🔗 Link do cliente</button><button class="danger" onclick="excluirOS('${o.id}')">🗑️ Excluir</button></div></div></div>
   <div class="osHeaderCard panel">
     <div class="osBrandLine"><img src="logo-wr-garagem.png" alt="WR Garagem"><div><b>WR Garagem</b><span>Manutenção • Confiança • Performance</span></div></div>
     <div class="osHeaderTop"><div><div class="osEyebrow">ORDEM DE SERVIÇO</div><h1 class="osNumber">${esc(osLabel(o.numero))}</h1><div class="muted">Aberta em ${o.created_at?new Date(o.created_at).toLocaleDateString('pt-BR'):'—'}</div></div><div class="osCurrentStatus ${osStatusClass(o.status)}">${esc(o.status||'Orçamento')}</div></div>
@@ -1440,6 +1441,48 @@ function printHTMLInNewWindow(html){
     },450);
   };
   if(w.document.readyState==='complete')doPrint();else w.addEventListener('load',doPrint,{once:true});
+}
+
+async function openOSPdfAction(){
+  const standalone=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  if(standalone&&navigator.share&&navigator.canShare){
+    try{await shareOSPdfReal();return}catch(e){console.warn('Compartilhamento PDF:',e);toast('Não foi possível compartilhar o PDF. Abrindo a versão normal...')}
+  }
+  printOS();
+}
+async function blobToDataURL(blob){return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)})}
+async function imageData(url){
+  if(!url)return null;
+  try{const r=await fetch(url,{mode:'cors',cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return await blobToDataURL(await r.blob())}catch(e){console.warn('Imagem PDF:',e);return null}
+}
+function pdfAddText(doc,text,x,y,maxWidth,lineH=5){const lines=doc.splitTextToSize(String(text||''),maxWidth);doc.text(lines,x,y);return y+lines.length*lineH}
+async function shareOSPdfReal(){
+  if(!window.jspdf?.jsPDF)throw new Error('Biblioteca PDF não carregada');
+  const cur=window.WR_CURRENT_OS_PRINT;if(!cur?.o)throw new Error('OS não encontrada');
+  const o=cur.o, pecas=cur.pecas||[], servicos=cur.servicos||[], pay=osPaymentInfo(o);
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210,H=297,M=12,content=W-M*2; let y=M;
+  const moneyBR=v=>money(Number(v||0));
+  const addPageIf=(h)=>{if(y+h>H-M){doc.addPage();y=M}};
+  doc.setFont('helvetica','bold');doc.setFontSize(18);doc.text('WR Garagem',M,y);y+=7;
+  doc.setFontSize(13);doc.text('ORDEM DE SERVIÇO '+osLabel(o.numero),M,y);y+=7;
+  doc.setFont('helvetica','normal');doc.setFontSize(9);
+  y=pdfAddText(doc,'Cliente: '+(o.clientes?.nome||'')+'    Telefone: '+(o.clientes?.telefone||''),M,y,content);y+=2;
+  y=pdfAddText(doc,'Veículo: '+[o.veiculos?.marca,o.veiculos?.modelo,o.veiculos?.ano].filter(Boolean).join(' ')+'    Placa: '+(o.veiculos?.placa||'')+'    KM: '+(o.km_entrada||''),M,y,content);y+=2;
+  y=pdfAddText(doc,'Status: '+(o.status||'')+'    Pagamento: '+(pay.label||''),M,y,content);y+=5;
+  const section=(title,arr)=>{addPageIf(18);doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text(title,M,y);y+=6;doc.setFont('helvetica','normal');doc.setFontSize(9);if(!arr.length){doc.text('Nenhum item adicionado.',M,y);y+=7;return}arr.forEach(x=>{addPageIf(10);const total=Number(x.quantidade||0)*Number(x.preco_unitario||0);y=pdfAddText(doc,(x.nome_historico||x.pecas?.nome||x.servicos?.nome||'Item')+' | Qtd: '+(x.quantidade||0)+' | Unit.: '+moneyBR(x.preco_unitario)+' | Total: '+moneyBR(total),M,y,content);y+=1})};
+  section('PEÇAS / PRODUTOS',pecas);section('SERVIÇOS',servicos);
+  addPageIf(30);doc.setFont('helvetica','bold');doc.setFontSize(11);doc.text('VALORES',M,y);y+=6;doc.setFont('helvetica','normal');doc.setFontSize(10);
+  y=pdfAddText(doc,'Total da OS: '+moneyBR(o.total),M,y,content);y+=2;
+  y=pdfAddText(doc,'Valor recebido: '+moneyBR(o.valor_pago),M,y,content);y+=2;
+  y=pdfAddText(doc,'Saldo: '+moneyBR(Math.max(0,Number(o.total||0)-Number(o.valor_pago||0))),M,y,content);y+=6;
+  if(o.diagnostico){addPageIf(22);doc.setFont('helvetica','bold');doc.text('DIAGNÓSTICO / SERVIÇOS / RECOMENDAÇÕES',M,y);y+=6;doc.setFont('helvetica','normal');y=pdfAddText(doc,o.diagnostico,M,y,content,4.5);y+=5}
+  if(o.observacoes){addPageIf(22);doc.setFont('helvetica','bold');doc.text('OBSERVAÇÕES',M,y);y+=6;doc.setFont('helvetica','normal');y=pdfAddText(doc,o.observacoes,M,y,content,4.5);y+=5}
+  let fotos=[];try{const cloud=await loadCloudPhotos(o.id);const local=getLocalPhotos(o.id).map((x,i)=>({...x,_localIndex:i}));fotos=[...cloud,...local].filter(x=>x.arquivo_url||x.data)}catch(e){console.warn(e)}
+  if(fotos.length){doc.addPage();y=M;doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('FOTOS DA EVOLUÇÃO DO SERVIÇO',M,y);y+=8;for(const f of fotos){const src=f.data||f.arquivo_url;const data=await imageData(src);if(!data)continue;try{const props=doc.getImageProperties(data);let w=content,h=w*props.height/props.width;h=Math.min(h,85);w=h*props.width/props.height;addPageIf(h+18);doc.addImage(data,'JPEG',M,y,w,h,undefined,'FAST');y+=h+4;doc.setFontSize(8);doc.setFont('helvetica','normal');doc.text(photoDescription(f.descricao||f.desc||'Foto da OS'),M,y);y+=7}catch(e){console.warn('addImage:',e)}}}
+  const blob=doc.output('blob'); const file=new File([blob],'WR-Garagem-'+osLabel(o.numero)+'.pdf',{type:'application/pdf'});
+  if(!navigator.canShare({files:[file]}))throw new Error('iOS não aceitou este PDF para compartilhamento');
+  await navigator.share({title:'WR Garagem — '+osLabel(o.numero),text:'Ordem de Serviço '+osLabel(o.numero),files:[file]});
 }
 
 async function printOS(){
