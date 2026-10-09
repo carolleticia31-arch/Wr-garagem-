@@ -1442,24 +1442,22 @@ function openOSPdfForIOS(){
   modal.style.zIndex='100000';
   modal.innerHTML=`<div class="modalbox" style="max-width:560px">
     <h2>📄 Salvar ou compartilhar PDF</h2>
-    <p>Você pode abrir o PDF normalmente aqui ou usar o Safari para salvar e compartilhar. O documento continuará usando a formatação original.</p>
-    <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0">
-      <button type="button" class="primary" id="iosPdfHereBtn">📄 Abrir PDF neste atalho</button>
-      <button type="button" class="secondary" id="iosPdfSafariBtn">Salvar/compartilhar pelo Safari</button>
-    </div>
-    <p class="muted">Para usar o Safari, copie o endereço e cole-o na barra do navegador.</p>
+    <p>O atalho do iPhone não exibe os controles do PDF. Para manter a formatação original, abra esta mesma versão pelo Safari.</p>
+    <ol style="padding-left:22px;line-height:1.6">
+      <li>Toque em <b>Copiar endereço</b> abaixo.</li>
+      <li>Abra o Safari e cole o endereço na barra.</li>
+      <li>Entre novamente no WR Garagem, abra a OS e toque em <b>PDF</b>.</li>
+    </ol>
     <div class="field"><label>Endereço desta versão</label><input id="iosPdfHelpUrl" readonly value="${esc(currentUrl)}" style="width:100%"></div>
     <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap">
-      <button type="button" class="secondary" id="iosPdfCopyBtn">Copiar endereço</button>
-      <button type="button" class="ghost" id="iosPdfSelectBtn">Selecionar endereço</button>
+      <button type="button" class="primary" id="iosPdfCopyBtn">Copiar endereço</button>
+      <button type="button" class="secondary" id="iosPdfSelectBtn">Selecionar endereço</button>
       <button type="button" class="ghost" id="iosPdfCloseBtn">Voltar à OS</button>
     </div>
     <p class="muted" id="iosPdfHelpStatus" aria-live="polite"></p>
   </div>`;
   document.body.appendChild(modal);
   const field=modal.querySelector('#iosPdfHelpUrl');
-  modal.querySelector('#iosPdfHereBtn').onclick=()=>{modal.remove();printOS();};
-  modal.querySelector('#iosPdfSafariBtn').onclick=()=>{field.focus();field.select();modal.querySelector('#iosPdfHelpStatus').textContent='Endereço selecionado. Toque em Copiar, abra o Safari e cole o endereço na barra.';};
   modal.querySelector('#iosPdfCopyBtn').onclick=async()=>{
     try{
       if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(currentUrl);modal.querySelector('#iosPdfHelpStatus').textContent='Endereço copiado. Abra o Safari e cole na barra de endereço.';}
@@ -1473,12 +1471,6 @@ function openOSPdfForIOS(){
 function printHTMLInNewWindow(html){
   const w=window.open('','_blank');
   if(!w){toast('O navegador bloqueou a janela de impressão. Permita pop-ups para o WR Garagem.');return;}
-  // Botão visível apenas na tela; não entra no PDF impresso. Permite retornar à OS
-  // mesmo quando o visualizador é aberto em modo standalone no iPhone.
-  const returnCss=`<style id="wrPdfReturnCss">#wrPdfReturnBar{position:sticky;top:0;z-index:99999;display:flex;justify-content:center;padding:10px;background:#171717;color:#fff;font:600 16px Arial,sans-serif}#wrPdfReturnBar button{border:0;border-radius:9px;padding:12px 18px;background:#e0ad45;color:#111;font-weight:700;font-size:16px}@media print{#wrPdfReturnBar{display:none!important}}</style>`;
-  const returnBar=`<div id="wrPdfReturnBar"><button type="button" onclick="try{window.close()}catch(e){};setTimeout(function(){try{history.back()}catch(e){}},120)">← Voltar à OS</button></div>`;
-  if(html.includes('</head>'))html=html.replace('</head>',returnCss+'</head>');
-  if(html.includes('<body'))html=html.replace(/(<body[^>]*>)/i,'$1'+returnBar);
   w.document.open();
   w.document.write(html);
   w.document.close();
