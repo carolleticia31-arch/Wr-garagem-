@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recuperar senha — WR Garagem</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#080a0c;--panel:#17191b;--line:#35393c;--gold:#d4ad58;--text:#f4f4f4;--muted:#aeb3b7}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;min-height:100vh;display:grid;place-items:center;padding:20px}.card{width:100%;max-width:480px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px}h1{font-size:26px;margin:0 0 12px}.muted{color:var(--muted);line-height:1.5}label{display:block;font-weight:600;margin:18px 0 8px}input{width:100%;padding:14px;border-radius:10px;border:1px solid #45494c;background:#0e1012;color:white;font-size:16px}button{margin-top:18px;border:0;border-radius:10px;background:var(--gold);color:#151515;font-weight:700;font-size:16px;padding:14px 18px;width:100%}#status{margin-top:16px;line-height:1.5;overflow-wrap:anywhere}.hidden{display:none}.small{font-size:13px}
+</style></head>
+<body><main class="card"><h1 id="heading">Recuperar senha</h1><p class="muted" id="intro">Esta página é exclusiva para redefinir a senha do WR Garagem.</p>
+<section id="configArea" class="hidden"><p class="muted">Este endereço não encontrou a configuração salva. Copie do login do WR Garagem a URL do projeto e a Publishable Key pública do Supabase.</p><label for="projectUrl">Project URL</label><input id="projectUrl" type="url" autocomplete="url" placeholder="https://seu-projeto.supabase.co"><label for="publishableKey">Publishable Key</label><input id="publishableKey" type="text" autocomplete="off" placeholder="sb_publishable_…"><button id="connectBtn">Salvar conexão e verificar link</button></section>
+<section id="formArea" class="hidden"><label for="pw">Nova senha</label><input id="pw" type="password" autocomplete="new-password" minlength="8" placeholder="Mínimo de 8 caracteres"><label for="pw2">Confirmar nova senha</label><input id="pw2" type="password" autocomplete="new-password" minlength="8" placeholder="Digite novamente"><button id="save">Salvar nova senha</button></section>
+<p id="status" role="status">Verificando o link de recuperação…</p><p class="muted small">Não compartilhe o link de recuperação nem códigos de acesso.</p></main>
+<script>
+(async()=>{
+ const $=id=>document.getElementById(id), say=t=>$('status').textContent=t;
+ const CONFIG_KEY='wr_garagem_supabase_config_v1';
+ let cfg=null, client=null, session=null;
+ try{cfg=JSON.parse(localStorage.getItem(CONFIG_KEY)||'null')}catch{}
+ const hash=new URLSearchParams(location.hash.slice(1));
+ const query=new URLSearchParams(location.search);
+ const error=hash.get('error_description')||hash.get('error')||query.get('error_description')||query.get('error');
+ if(error){say('O link de recuperação foi recusado ou expirou. Solicite um novo link somente depois de corrigir a configuração.');return}
+ if(!window.supabase?.createClient){say('A biblioteca de autenticação não carregou. Atualize a página e tente novamente.');return}
+ function showConfig(message){$('configArea').classList.remove('hidden');$('formArea').classList.add('hidden');if(message)say(message);if(cfg){$('projectUrl').value=cfg.url||'';$('publishableKey').value=cfg.key||''}}
+ async function connectAndValidate(){
+  const url=$('projectUrl').value.trim(), key=$('publishableKey').value.trim();
+  if(!url||!key){say('Preencha a URL do projeto e a Publishable Key.');return}
+  try{new URL(url)}catch{say('A URL do projeto não parece válida.');return}
+  try{
+   localStorage.setItem(CONFIG_KEY,JSON.stringify({url,key}));
+   cfg={url,key}; client=window.supabase.createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+   const at=hash.get('access_token'), rt=hash.get('refresh_token');
+   if(at&&rt){const r=await client.auth.setSession({access_token:at,refresh_token:rt});if(r.error)throw r.error;session=r.data.session}
+   else {const r=await client.auth.getSession();if(r.error)throw r.error;session=r.data.session}
+   if(!session){say('Não há uma sessão de recuperação válida neste link. Solicite um novo e-mail depois de confirmar a configuração.');return}
+   history.replaceState(null,'',location.pathname+location.search);
+   $('configArea').classList.add('hidden');$('heading').textContent='Definir nova senha';$('intro').textContent='Digite e confirme a nova senha da conta WR Garagem.';$('formArea').classList.remove('hidden');say('Link validado. Agora defina sua nova senha.');
+  }catch(e){console.error(e);say('Não foi possível validar a conexão ou o link. Confira a URL e a Publishable Key. Detalhe: '+(e?.message||'erro de autenticação'))}
+ }
+ $('connectBtn').addEventListener('click',connectAndValidate);
+ $('save').addEventListener('click',async()=>{
+  const a=$('pw').value,b=$('pw2').value;
+  if(a.length<8){say('Use uma senha com pelo menos 8 caracteres.');return}
+  if(a!==b){say('As senhas não coincidem.');return}
+  if(!client||!session){say('A sessão não está validada. Recarregue o link de recuperação e tente novamente.');return}
+  $('save').disabled=true;$('save').textContent='Salvando…';
+  try{const r=await client.auth.updateUser({password:a});if(r.error)throw r.error;$('heading').textContent='Senha alterada';$('intro').textContent='Sua senha foi atualizada. Volte ao WR Garagem e entre com a nova senha.';$('formArea').classList.add('hidden');say('Concluído. A nova senha foi salva.');}
+  catch(e){say('Não foi possível salvar a senha: '+(e?.message||'erro'));$('save').disabled=false;$('save').textContent='Salvar nova senha'}
+ });
+ if(!cfg?.url||!cfg?.key){showConfig('A configuração não está salva neste endereço. Para continuar, informe os dados públicos de conexão do Supabase.');return}
+ $('projectUrl').value=cfg.url;$('publishableKey').value=cfg.key;
+ // Use saved config automatically when present; if it belongs to a different origin, ask for it explicitly.
+ await connectAndValidate();
+})().catch(e=>{document.getElementById('status').textContent='Erro ao validar a recuperação. Atualize a página ou solicite um novo link.';console.error(e)});
+</script></body></html>
