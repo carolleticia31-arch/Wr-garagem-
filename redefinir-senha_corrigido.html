@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Redefinir senha — WR Garagem</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#0d0f10;--panel:#171a1b;--line:#303638;--text:#f2f3f3;--muted:#aab0b2;--red:#d9282f}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--text);font:16px system-ui,-apple-system,sans-serif;padding:20px}.card{width:min(100%,440px);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;box-shadow:0 12px 35px #0005}.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}.logo{display:grid;place-items:center;background:var(--red);border-radius:10px;width:48px;height:48px;font-weight:900;font-size:22px}.brand h1{font-size:21px;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:13px}label{display:block;margin:16px 0 7px;font-size:14px}input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;background:#0d0f10;color:var(--text);font:inherit}button{width:100%;margin-top:20px;padding:14px;border:0;border-radius:10px;background:var(--red);color:white;font-weight:750;font-size:16px}button:disabled{opacity:.55}#status{line-height:1.5;overflow-wrap:anywhere;color:var(--muted);margin-top:18px}.hint{font-size:12px;color:var(--muted);margin-top:14px}.hidden{display:none}
+</style></head><body><main class="card"><div class="brand"><div class="logo">WR</div><div><h1>WR Garagem</h1><p>Redefinição segura de senha</p></div></div><p>Defina uma nova senha para sua conta.</p><form id="configForm" class="hidden"><label for="projectUrl">Project URL do Supabase</label><input id="projectUrl" type="url" placeholder="https://seu-projeto.supabase.co" autocomplete="url"><label for="publishableKey">Publishable Key do Supabase</label><input id="publishableKey" type="password" placeholder="sb_publishable_..." autocomplete="off"><button type="submit">Continuar</button></form><form id="form" class="hidden"><label for="pw">Nova senha (mínimo 8 caracteres)</label><input id="pw" type="password" minlength="8" autocomplete="new-password" required><label for="pw2">Confirme a nova senha</label><input id="pw2" type="password" minlength="8" autocomplete="new-password" required><button id="save" type="submit">Salvar nova senha</button></form><p id="status" role="status">Validando o link de recuperação…</p><p class="hint">Não compartilhe seu link de recuperação com ninguém.</p></main>
+<script>
+(async()=>{
+ const $=id=>document.getElementById(id), status=$('status'), say=t=>status.textContent=t;
+ const cfgKey='wr_garagem_supabase_config_v1'; let cfg;
+ try{cfg=JSON.parse(localStorage.getItem(cfgKey)||'null')}catch{}
+ if(!window.supabase?.createClient){say('A biblioteca de autenticação não carregou. Verifique a conexão e recarregue a página.');return}
+ const hash=new URLSearchParams(location.hash.replace(/^#/,'').replace(/^.*\?/,'') );
+ const query=new URLSearchParams(location.search);
+ const err=hash.get('error_description')||query.get('error_description')||hash.get('error')||query.get('error');
+ if(err){say('O link de recuperação expirou ou foi recusado. Solicite um novo link e abra-o uma única vez.');return}
+ const access=hash.get('access_token')||query.get('access_token'), refresh=hash.get('refresh_token')||query.get('refresh_token'), code=query.get('code');
+ let client=null, session=null;
+ async function continueWithConfig(c){
+  if(!c?.url||!c?.key){say('Preencha a URL e a Publishable Key do Supabase.');return}
+  try{localStorage.setItem(cfgKey,JSON.stringify({url:c.url.trim(),key:c.key.trim()}))}catch{}
+  client=window.supabase.createClient(c.url.trim(),c.key.trim(),{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'implicit'}});
+  if(access&&refresh){const r=await client.auth.setSession({access_token:access,refresh_token:refresh});if(r.error){say('Não foi possível validar este link. Solicite um novo e-mail de recuperação.');return}session=r.data.session}
+  else if(code){const r=await client.auth.exchangeCodeForSession(code);if(r.error){say('Não foi possível validar este link. Solicite um novo e-mail de recuperação.');return}session=r.data.session}
+  else {const r=await client.auth.getSession();session=r.data.session}
+  if(!session){say('Não há uma sessão de recuperação válida. Solicite um novo link e abra o endereço recebido no e-mail.');return}
+  history.replaceState(null,'',location.pathname+location.search);$('configForm').classList.add('hidden');$('form').classList.remove('hidden');say('Link validado. Digite e confirme sua nova senha.');
+ }
+ if(cfg?.url&&cfg?.key){await continueWithConfig(cfg)}else{$('configForm').classList.remove('hidden');say('Informe a URL e a Publishable Key usadas no WR Garagem para validar o link. O link de recuperação será mantido nesta página.');}
+ $('configForm').addEventListener('submit',async e=>{e.preventDefault();await continueWithConfig({url:$('projectUrl').value,key:$('publishableKey').value})});
+ $('form').addEventListener('submit',async e=>{e.preventDefault();const a=$('pw').value,b=$('pw2').value;if(a.length<8){say('A senha precisa ter pelo menos 8 caracteres.');return}if(a!==b){say('As senhas não coincidem. Confira os dois campos.');return}$('save').disabled=true;say('Salvando a nova senha…');const r=await client.auth.updateUser({password:a});if(r.error){say('Não foi possível salvar a senha: '+r.error.message);$('save').disabled=false;return}say('Senha alterada com sucesso. Agora você pode voltar ao WR Garagem e entrar com seu e-mail e a nova senha.');$('form').classList.add('hidden');await client.auth.signOut();
+ });
+})().catch(e=>{document.getElementById('status').textContent='Erro ao validar o link: '+(e?.message||e)});
+</script></body></html>
